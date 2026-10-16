@@ -3,7 +3,6 @@ package com.trainguy9512.locomotion;
 import com.trainguy9512.locomotion.animation.animator.JointAnimatorRegistry;
 import com.trainguy9512.locomotion.animation.animator.block_entity.ChestJointAnimator;
 import com.trainguy9512.locomotion.animation.animator.block_entity.ShulkerBoxJointAnimator;
-import com.trainguy9512.locomotion.animation.animator.entity.ThirdPersonPlayerJointAnimator;
 import com.trainguy9512.locomotion.animation.animator.entity.firstperson.FirstPersonJointAnimator;
 import com.trainguy9512.locomotion.config.LocomotionConfig;
 import net.minecraft.resources.Identifier;
@@ -46,7 +45,8 @@ public class LocomotionMain {
 	private static void registerAnimators() {
 		JointAnimatorRegistry.registerFirstPersonPlayerJointAnimator(new FirstPersonJointAnimator());
 
-		JointAnimatorRegistry.registerEntityJointAnimator(net.minecraft.world.entity.EntityTypes.PLAYER, new ThirdPersonPlayerJointAnimator());
+		// The third-person prototype only returns a fixed reference pose. Leave it
+		// unregistered so Minecraft and cosmetic mods can animate the player normally.
 
 		JointAnimatorRegistry.registerBlockEntityJointAnimator(net.minecraft.world.level.block.entity.BlockEntityTypes.CHEST, new ChestJointAnimator<>());
 		JointAnimatorRegistry.registerBlockEntityJointAnimator(net.minecraft.world.level.block.entity.BlockEntityTypes.ENDER_CHEST, new ChestJointAnimator<>());
