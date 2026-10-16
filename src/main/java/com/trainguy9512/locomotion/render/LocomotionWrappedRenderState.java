@@ -1,29 +1,21 @@
 package com.trainguy9512.locomotion.render;
 
-import com.trainguy9512.locomotion.animation.data.AnimationDataContainer;
-import org.jetbrains.annotations.Nullable;
+import com.trainguy9512.locomotion.access.BlockEntityPoseAccess;
+import com.trainguy9512.locomotion.animation.animator.JointAnimatorDispatcher;
+import com.trainguy9512.locomotion.animation.pose.ModelPartSpacePose;
+import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
+import net.minecraft.world.level.block.entity.BlockEntity;
 
-import java.util.Optional;
-
-public class LocomotionWrappedRenderState<D> {
-
-    private final D innerValue;
-    private final AnimationDataContainer dataContainer;
-
-    private LocomotionWrappedRenderState(D innerValue, @Nullable AnimationDataContainer dataContainer) {
-        this.innerValue = innerValue;
-        this.dataContainer = dataContainer;
+/** Carries a sampled pose through deferred model and breaking-overlay rendering. */
+public record LocomotionWrappedRenderState<D>(D innerValue, ModelPartSpacePose pose) {
+    public static Object wrap(Object value, ModelPartSpacePose pose) {
+        return pose == null ? value : new LocomotionWrappedRenderState<>(value, pose);
     }
 
-    public static <D> LocomotionWrappedRenderState<D> of(D innerValue, @Nullable AnimationDataContainer dataContainer) {
-        return new LocomotionWrappedRenderState<>(innerValue, dataContainer);
-    }
-
-    public D getInnerValue() {
-        return this.innerValue;
-    }
-
-    public Optional<AnimationDataContainer> getDataContainer() {
-        return Optional.ofNullable(this.dataContainer);
+    public static void extract(BlockEntity entity, BlockEntityRenderState state, float partialTick) {
+        ModelPartSpacePose pose = entity.hasLevel() ? JointAnimatorDispatcher.getInstance()
+                .getBlockEntityAnimationDataContainer(entity.getBlockPos(), entity.getType())
+                .map(data -> data.getInterpolatedAnimationPose(partialTick)).orElse(null) : null;
+        ((BlockEntityPoseAccess) state).locomotion$setPose(pose);
     }
 }

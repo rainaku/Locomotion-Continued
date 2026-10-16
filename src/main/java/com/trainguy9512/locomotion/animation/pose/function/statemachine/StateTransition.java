@@ -6,7 +6,7 @@ import com.trainguy9512.locomotion.animation.driver.DriverKey;
 import com.trainguy9512.locomotion.animation.pose.function.AnimationPlayer;
 import com.trainguy9512.locomotion.animation.util.TimeSpan;
 import com.trainguy9512.locomotion.animation.util.Transition;
-import net.minecraft.util.Tuple;
+import com.mojang.datafixers.util.Pair;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
@@ -47,14 +47,14 @@ public record StateTransition(
         if (potentialPlayer.isPresent()) {
             AnimationPlayer player = potentialPlayer.get();
             float transitionTimeTicks = context.transitionDuration().inTicks() * crossFadeWeight;
-            Tuple<TimeSpan, TimeSpan> remainingTime = player.getRemainingTime();
+            Pair<TimeSpan, TimeSpan> remainingTime = player.getRemainingTime();
 
             // Mid-animation
-            if (remainingTime.getA().inTicks() > remainingTime.getB().inTicks()) {
-                return transitionTimeTicks < remainingTime.getA().inTicks() && transitionTimeTicks >= remainingTime.getB().inTicks();
+            if (remainingTime.getFirst().inTicks() > remainingTime.getSecond().inTicks()) {
+                return transitionTimeTicks < remainingTime.getFirst().inTicks() && transitionTimeTicks >= remainingTime.getSecond().inTicks();
                 // Looping (remaining time wrapping around 0), but NOT stopped.
-            } else if (remainingTime.getA().inTicks() < remainingTime.getB().inTicks()) {
-                return transitionTimeTicks < remainingTime.getA().inTicks();
+            } else if (remainingTime.getFirst().inTicks() < remainingTime.getSecond().inTicks()) {
+                return transitionTimeTicks < remainingTime.getFirst().inTicks();
             }
         }
         return false;

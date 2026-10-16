@@ -66,7 +66,7 @@ public class FirstPersonDrivers {
     public static final DriverKey<VariableDriver<InteractionHand>> LAST_USED_HAND = DriverKey.of("last_used_hand", () -> VariableDriver.ofConstant(() -> InteractionHand.MAIN_HAND));
     public static final DriverKey<VariableDriver<Integer>> LAST_USED_SWING_TIME = DriverKey.of("last_used_swing_time", () -> VariableDriver.ofConstant(() -> 0));
     public static final DriverKey<VariableDriver<Boolean>> LAST_USED_SWING_FROM_CLIENT = DriverKey.of("last_used_swing_from_client", () -> VariableDriver.ofConstant(() -> false));
-    public static final DriverKey<VariableDriver<EntityType<?>>> LAST_USED_TARGET_ENTITY = DriverKey.of("last_used_target_entity", () -> VariableDriver.ofConstant(() -> EntityType.COW));
+    public static final DriverKey<VariableDriver<EntityType<?>>> LAST_USED_TARGET_ENTITY = DriverKey.of("last_used_target_entity", () -> VariableDriver.ofConstant(() -> net.minecraft.world.entity.EntityTypes.COW));
     public static final DriverKey<VariableDriver<BlockState>> LAST_USED_TARGET_BLOCK_STATE = DriverKey.of("last_used_target_block_state", () -> VariableDriver.ofConstant(Blocks.AIR::defaultBlockState));
     public static final DriverKey<VariableDriver<FirstPersonUseAnimations.UseAnimationType>> LAST_USE_TYPE = DriverKey.of("last_use_type", () -> VariableDriver.ofConstant(() -> FirstPersonUseAnimations.UseAnimationType.USE_ITEM_ON_BLOCK));
 

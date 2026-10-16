@@ -1,71 +1,100 @@
-@file:Suppress("UnstableApiUsage")
-
 plugins {
-	id("dev.architectury.loom")
-	id("architectury-plugin")
+    id("net.fabricmc.fabric-loom") version "1.17.21"
+    `maven-publish`
 }
 
-val minecraft = stonecutter.current.version
-
-version = "${prop("mod.version")}+$minecraft-playtesting"
-base {
-	archivesName.set("${prop("mod.id")}-common")
-}
-
-architectury.common(stonecutter.tree.branches.mapNotNull {
-	if (stonecutter.current.project !in it) null
-	else it.project.prop("loom.platform")
-})
-
-loom {
-	silentMojangMappingsLicense()
-	accessWidenerPath = rootProject.file("src/main/resources/${prop("mod.id")}.accesswidener")
-
-	decompilers {
-		get("vineflower").apply { // Adds names to lambdas - useful for mixins
-			options.put("mark-corresponding-synthetics", "1")
-		}
-	}
-}
+version = "${property("mod_version")}+${property("minecraft_version")}"
+group = property("maven_group")!!
+base.archivesName.set("locomotion-fabric")
 
 repositories {
-	maven("https://maven.parchmentmc.org/")
-
-	maven("https://maven.terraformersmc.com/")
-	maven("https://maven.isxander.dev/releases")
-	maven("https://api.modrinth.com/maven")
-	maven {
-		name = "Gegy"
-		url = uri("https://maven.gegy.dev/releases/")
-	}
+    maven("https://maven.isxander.dev/releases")
+    maven("https://maven.terraformersmc.com/releases")
+    maven("https://api.modrinth.com/maven")
 }
 
 dependencies {
-	minecraft("com.mojang:minecraft:$minecraft")
-	mappings(loom.layered {
-		officialMojangMappings()
-		parchment("org.parchmentmc.data:parchment-${versionProp("parchment_minecraft_version")}:${versionProp("parchment_mappings_version")}@zip")
-//		mappings("dev.lambdaurora:${versionProp("yalmm")}")
-	})
-	modImplementation("net.fabricmc:fabric-loader:${versionProp("fabric_loader")}")
+    minecraft("com.mojang:minecraft:${property("minecraft_version")}")
+    implementation("net.fabricmc:fabric-loader:${property("loader_version")}")
+    implementation("net.fabricmc.fabric-api:fabric-api:${property("fabric_api_version")}")
+    compileOnly("dev.isxander:yet-another-config-lib:${property("yacl_version")}")
+    compileOnly("com.terraformersmc:modmenu:${property("modmenu_version")}")
+    if (providers.gradleProperty("configUi").orNull == "true") {
+        runtimeOnly("dev.isxander:yet-another-config-lib:${property("yacl_version")}")
+        runtimeOnly("com.terraformersmc:modmenu:${property("modmenu_version")}")
+    }
+    val compatMods = providers.gradleProperty("compatMods").orNull.orEmpty().split(",")
+    if ("sodium" in compatMods || "iris" in compatMods) {
+        runtimeOnly("maven.modrinth:sodium:mc26.3-0.9.2-fabric")
+    }
+    if ("iris" in compatMods) {
+        runtimeOnly("maven.modrinth:iris:1.11.7+26.3-fabric")
+    }
+    if ("skinlayers" in compatMods) {
+        runtimeOnly("maven.modrinth:3dskinlayers:G8BCRxv5")
+    }
+}
 
-	// Mod implementations
-	modCompileOnly("dev.isxander:yet-another-config-lib:${versionProp("yacl_version")}-fabric")
+sourceSets.main {
+    java.srcDir("fabric/src/main/java")
+    resources.srcDir("fabric/src/main/resources")
+    resources.exclude("architectury.common.json", "locomotion.accesswidener")
+}
+
+loom {
+    runs.named("client") {
+        programArgs("--username", "Dev")
+        runDir("run")
+    }
+    runs.configureEach {
+        if (name == "clientGameTest") {
+            val backend = providers.gradleProperty("graphicsBackend").orElse("opengl").get()
+            require(backend in listOf("opengl", "vulkan")) { "graphicsBackend must be opengl or vulkan" }
+            vmArg("-Dlocomotion.test.backend=$backend")
+            programArgs("--graphicsBackend", backend.uppercase())
+        }
+    }
 }
 
 tasks.processResources {
-	applyProperties(project, listOf("${prop("mod.id")}-common.mixin.json"))
+    val properties = mapOf(
+        "mod_id" to "locomotion",
+        "mod_group" to "com.trainguy9512",
+        "mod_version" to project.version,
+        "mod_name" to "Locomotion",
+        "mod_description" to "An animation overhaul mod",
+        "minecraft_version" to project.property("minecraft_version"),
+        "fabric_loader_version" to project.property("loader_version"),
+        "fabric_api_version" to project.property("fabric_api_version")
+    )
+    inputs.properties(properties)
+    filesMatching(listOf("fabric.mod.json", "locomotion-fabric.mixins.json")) {
+        expand(properties)
+    }
 }
 
 java {
-	withSourcesJar()
-	val java = if (stonecutter.eval(minecraft, ">=1.20.5"))
-		JavaVersion.VERSION_21 else JavaVersion.VERSION_17
-	targetCompatibility = java
-	sourceCompatibility = java
+    toolchain.languageVersion.set(JavaLanguageVersion.of(25))
+    withSourcesJar()
 }
 
-tasks.build {
-	group = "versioned"
-	description = "Must run through 'chiseledBuild'"
+tasks.withType<JavaCompile>().configureEach {
+    options.encoding = "UTF-8"
+    options.release.set(25)
+}
+
+tasks.jar {
+    from("LICENSE") { rename { "${it}_locomotion" } }
+}
+
+// Preserve the familiar build command for existing local workflows.
+tasks.register("chiseledBuild") { dependsOn(tasks.build) }
+
+fabricApi {
+    configureTests {
+        createSourceSet = true
+        modId = "locomotion-test"
+        enableGameTests = false
+        enableClientGameTests = true
+    }
 }

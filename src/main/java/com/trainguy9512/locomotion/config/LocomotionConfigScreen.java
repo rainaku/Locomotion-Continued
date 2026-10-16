@@ -242,7 +242,7 @@ public class LocomotionConfigScreen {
                         .build());
 
         for (BlockEntityType<?> blockEntityType : JointAnimatorRegistry.getRegisteredBlockEntities()) {
-            Identifier blockEntityTypeIdentifier = BlockEntityType.getKey(blockEntityType);
+            Identifier blockEntityTypeIdentifier = net.minecraft.core.registries.BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(blockEntityType);
             assert blockEntityTypeIdentifier != null;
             blockTogglesBuilder.option(Option.<Boolean>createBuilder()
                     .name(Component.translatable("block." + blockEntityTypeIdentifier.toLanguageKey()))

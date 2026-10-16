@@ -16,7 +16,7 @@ import net.minecraft.client.renderer.entity.*;
 import net.minecraft.client.renderer.entity.layers.RenderLayer;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.client.renderer.entity.state.LivingEntityRenderState;
-import net.minecraft.client.renderer.state.CameraRenderState;
+import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.core.Direction;
 import net.minecraft.world.entity.LivingEntity;
 import org.jetbrains.annotations.NotNull;
@@ -41,7 +41,7 @@ public abstract class MixinLivingEntityRenderer<S extends LivingEntityRenderStat
 
 
     @Inject(
-            method = "submit(Lnet/minecraft/client/renderer/entity/state/LivingEntityRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/CameraRenderState;)V",
+            method = "submit(Lnet/minecraft/client/renderer/entity/state/LivingEntityRenderState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;Lnet/minecraft/client/renderer/state/level/CameraRenderState;)V",
             at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/entity/layers/RenderLayer;submit(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;ILnet/minecraft/client/renderer/entity/state/EntityRenderState;FF)V")
     )
     private void poseModel(LivingEntityRenderState renderState, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState, CallbackInfo ci, @Local RenderLayer<?, ?> renderLayer) {
@@ -59,7 +59,7 @@ public abstract class MixinLivingEntityRenderer<S extends LivingEntityRenderStat
         if (potentialPose.isPresent()) {
             ModelPartSpacePose pose = potentialPose.get();
             float rotation = pose.getCustomAttributeValueOrDefault(LivingEntityJointAnimator.ENTITY_ROTATION_ATTRIBUTE, 0);
-            poseStack.mulPose(Axis.YP.rotationDegrees(180.0F - rotation));
+            poseStack.rotateDegrees(Axis.YP, 180.0F - rotation);
             ci.cancel();
         }
     }

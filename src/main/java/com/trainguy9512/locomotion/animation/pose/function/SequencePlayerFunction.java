@@ -10,7 +10,7 @@ import com.trainguy9512.locomotion.resource.LocomotionResources;
 import com.trainguy9512.locomotion.animation.util.TimeSpan;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
-import net.minecraft.util.Tuple;
+import com.mojang.datafixers.util.Pair;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
@@ -113,7 +113,7 @@ public class SequencePlayerFunction extends TimeBasedPoseFunction<LocalSpacePose
     }
 
     @Override
-    public Tuple<TimeSpan, TimeSpan> getRemainingTime() {
+    public Pair<TimeSpan, TimeSpan> getRemainingTime() {
         float lengthInTicks = LocomotionResources.getOrThrowAnimationSequence(animationSequence).length().inTicks();
         float remainingTimePreviously;
         float remainingTimeCurrently;
@@ -124,7 +124,7 @@ public class SequencePlayerFunction extends TimeBasedPoseFunction<LocalSpacePose
             remainingTimePreviously = lengthInTicks - (Mth.clamp(this.ticksElapsed.getCurrentValue() - this.playRate, 0, lengthInTicks));
             remainingTimeCurrently = lengthInTicks - (Mth.clamp(this.ticksElapsed.getCurrentValue(), 0, lengthInTicks));
         }
-        return new Tuple<>(TimeSpan.ofTicks(remainingTimePreviously), TimeSpan.ofTicks(remainingTimeCurrently));
+        return Pair.of(TimeSpan.ofTicks(remainingTimePreviously), TimeSpan.ofTicks(remainingTimeCurrently));
     }
 
     @Override

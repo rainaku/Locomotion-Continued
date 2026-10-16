@@ -2,11 +2,10 @@
   "required": true,
   "minVersion": "0.8",
   "package": "com.trainguy9512.locomotion.mixin",
-  "compatibilityLevel": "JAVA_17",
+  "compatibilityLevel": "JAVA_25",
   "mixins": [
   ],
   "client": [
-    "debug.MixinDefaultPlayerSkin",
     "game.MixinLevelChunk",
     "game.MixinMinecraft",
     "game.MixinMultiPlayerGameMode",
@@ -16,7 +15,6 @@
     "item.property.MixinIsUsingItem",
     "item.property.MixinUseCycle",
     "item.property.MixinUseDuration",
-    "render.MixinBlockRenderDispatcher",
     "render.MixinEntityRenderDispatcher",
     "render.MixinEntityRenderer",
     "render.MixinEntityRenderState",
@@ -26,6 +24,7 @@
     "render.MixinLivingEntityRenderer",
     "render.MixinModelFeatureRenderer",
     "render.MixinModelPart",
+    "render.block_entity.MixinBlockEntityRenderState",
     "render.block_entity.MixinChestRenderer",
     "render.block_entity.MixinShulkerBoxRenderer"
   ],

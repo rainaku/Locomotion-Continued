@@ -4,7 +4,6 @@
 build/
 out/
 classes/
-gradle/wrapper/gradle-wrapper.jar
 
 build.properties
 .architectury-transformer
@@ -26,3 +25,7 @@ hs_err_*.log
 replay_*.log
 *.hprof
 *.jfr
+
+# Local port verification logs
+/port-*.log
+scripts/Test-Compatibility.ps1

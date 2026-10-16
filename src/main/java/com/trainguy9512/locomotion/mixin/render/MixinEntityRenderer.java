@@ -24,6 +24,7 @@ public class MixinEntityRenderer<T extends Entity, S extends EntityRenderState> 
     )
     private void calculatePoseIntoRenderState(T entity, S reusedState, float partialTick, CallbackInfo ci) {
         Optional<AnimationDataContainer> potentialDataContainer = JointAnimatorDispatcher.getInstance().getEntityAnimationDataContainer(entity);
+        ((EntityRenderStateAccess)reusedState).animationOverhaul$setInterpolatedAnimationPose(null);
         if (potentialDataContainer.isPresent()) {
             AnimationDataContainer dataContainer = potentialDataContainer.get();
             ModelPartSpacePose pose = dataContainer.getInterpolatedAnimationPose(partialTick);

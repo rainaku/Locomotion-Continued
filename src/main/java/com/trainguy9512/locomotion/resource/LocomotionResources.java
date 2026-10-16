@@ -70,14 +70,15 @@ public class LocomotionResources implements PreparableReloadListener {
 
         return CompletableFuture.allOf(loadedJointSkeletons, loadedAnimationSequences)
                 .thenCompose(barrier::wait)
-                .thenCompose(voided -> CompletableFuture.runAsync(() -> {
+                .thenRunAsync(() -> {
                     JOINT_SKELETONS.clear();
                     JOINT_SKELETONS.putAll(loadedJointSkeletons.join());
                     ANIMATION_SEQUENCES.clear();
                     ANIMATION_SEQUENCES.putAll(loadedAnimationSequences.join());
                     ANIMATION_SEQUENCES.replaceAll((Identifier, animationSequence) -> animationSequence.getBaked());
+                    com.trainguy9512.locomotion.animation.animator.JointAnimatorDispatcher.getInstance().reInitializeData();
                     LOGGER.info("Cleared and replaced Locomotion resource data.");
-                }));
+                }, applyExectutor);
     }
 
 //    public static CompletableFuture<Void> reload(PreparableReloadListener.PreparationBarrier barrier, ResourceManager manager, Executor backgroundExecutor, Executor gameExecutor) {
@@ -118,7 +119,7 @@ public class LocomotionResources implements PreparableReloadListener {
 
     private static <D> CompletableFuture<Map<Identifier, D>> loadJsonResources(ResourceManager manager, Executor backgroundExecutor, Class<D> type, String pathToListFrom, Consumer<Identifier> onSuccessfullyLoaded) {
         return CompletableFuture.supplyAsync(() -> {
-            Predicate<Identifier> isAssetJson = Identifier -> Identifier.getPath().endsWith(".json");
+            ResourceManager.Selector isAssetJson = identifier -> identifier.getPath().endsWith(".json");
             Map<Identifier, Resource> foundResources = manager.listResources(pathToListFrom, isAssetJson);
 
             Map<Identifier, D> deserializedResources = Maps.newHashMap();

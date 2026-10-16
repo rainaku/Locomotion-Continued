@@ -114,7 +114,7 @@ public class FirstPersonGenericItems {
     );
 
     public static final List<TagKey<Item>> BLOCK_ITEM_TAG_OVERRIDES = List.of(
-            ItemTags.COPPER_CHESTS,
+            net.minecraft.tags.BlockItemTags.COPPER_CHESTS.item(),
             ItemTags.SHULKER_BOXES,
             ItemTags.SKULLS,
             ItemTags.BEDS
@@ -140,7 +140,7 @@ public class FirstPersonGenericItems {
     }
 
     private static boolean isDoorItem(ItemStack itemStack) {
-        return itemStack.is(ItemTags.DOORS);
+        return itemStack.is(net.minecraft.tags.BlockItemTags.DOORS.item());
     }
 
     public static Identifier getCurrentBasePose(DriverGetter dataContainer, InteractionHand hand) {

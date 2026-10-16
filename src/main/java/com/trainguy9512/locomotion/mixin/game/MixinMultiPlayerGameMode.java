@@ -119,24 +119,10 @@ public class MixinMultiPlayerGameMode {
     }
 
     @Inject(
-            method = "interactAt",
-            at = @At("RETURN")
-    )
-    public void triggerInteractAtAnimation(Player player, Entity target, EntityHitResult ray, InteractionHand hand, CallbackInfoReturnable<InteractionResult> cir) {
-        if (cir.getReturnValue() instanceof InteractionResult.Success success) {
-            FirstPersonUseAnimations.triggerUseAnimation(
-                    hand,
-                    FirstPersonUseAnimations.UseAnimationType.INTERACT_AT_ENTITY,
-                    success.swingSource()
-            );
-        }
-    }
-
-    @Inject(
             method = "interact",
             at = @At("RETURN")
     )
-    public void triggerInteractAnimation(Player player, Entity target, InteractionHand hand, CallbackInfoReturnable<InteractionResult> cir) {
+    public void triggerInteractAnimation(Player player, Entity target, EntityHitResult hitResult, InteractionHand hand, CallbackInfoReturnable<InteractionResult> cir) {
         if (cir.getReturnValue() instanceof InteractionResult.Success success) {
             FirstPersonUseAnimations.triggerUseAnimation(
                     hand,

@@ -261,7 +261,7 @@ public class FirstPersonUseAnimations {
         dataContainer.getDriver(FirstPersonDrivers.getHasUsedItemDriver(hand)).trigger();
         dataContainer.getDriver(FirstPersonDrivers.LAST_USE_TYPE).setValue(useAnimationType);
         dataContainer.getDriver(FirstPersonDrivers.LAST_USED_HAND).setValue(hand);
-        dataContainer.getDriver(FirstPersonDrivers.LAST_USED_SWING_FROM_CLIENT).setValue(swingSource == InteractionResult.SwingSource.CLIENT);
+        dataContainer.getDriver(FirstPersonDrivers.LAST_USED_SWING_FROM_CLIENT).setValue(swingSource == InteractionResult.SwingSource.PREDICTED);
     }
 
     public static void updateUseAnimationHitResults(AnimationDataContainer dataContainer) {

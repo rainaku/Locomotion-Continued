@@ -46,12 +46,12 @@ public class LocomotionMain {
 	private static void registerAnimators() {
 		JointAnimatorRegistry.registerFirstPersonPlayerJointAnimator(new FirstPersonJointAnimator());
 
-		JointAnimatorRegistry.registerEntityJointAnimator(EntityType.PLAYER, new ThirdPersonPlayerJointAnimator());
+		JointAnimatorRegistry.registerEntityJointAnimator(net.minecraft.world.entity.EntityTypes.PLAYER, new ThirdPersonPlayerJointAnimator());
 
-		JointAnimatorRegistry.registerBlockEntityJointAnimator(BlockEntityType.CHEST, new ChestJointAnimator<>());
-		JointAnimatorRegistry.registerBlockEntityJointAnimator(BlockEntityType.ENDER_CHEST, new ChestJointAnimator<>());
-		JointAnimatorRegistry.registerBlockEntityJointAnimator(BlockEntityType.TRAPPED_CHEST, new ChestJointAnimator<>());
-		JointAnimatorRegistry.registerBlockEntityJointAnimator(BlockEntityType.SHULKER_BOX, new ShulkerBoxJointAnimator());
+		JointAnimatorRegistry.registerBlockEntityJointAnimator(net.minecraft.world.level.block.entity.BlockEntityTypes.CHEST, new ChestJointAnimator<>());
+		JointAnimatorRegistry.registerBlockEntityJointAnimator(net.minecraft.world.level.block.entity.BlockEntityTypes.ENDER_CHEST, new ChestJointAnimator<>());
+		JointAnimatorRegistry.registerBlockEntityJointAnimator(net.minecraft.world.level.block.entity.BlockEntityTypes.TRAPPED_CHEST, new ChestJointAnimator<>());
+		JointAnimatorRegistry.registerBlockEntityJointAnimator(net.minecraft.world.level.block.entity.BlockEntityTypes.SHULKER_BOX, new ShulkerBoxJointAnimator());
 	}
 
 	/*
