@@ -1,5 +1,6 @@
 package com.trainguy9512.locomotion.mixin.render;
 
+import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.trainguy9512.locomotion.LocomotionMain;
 import com.trainguy9512.locomotion.access.FirstPersonPlayerRendererGetter;
@@ -34,6 +35,14 @@ public abstract class MixinGameRenderer {
     private void locomotion$extractItems(DeltaTracker deltaTracker, boolean advanceGameTime, CallbackInfo ci) {
         ((FirstPersonPlayerRendererGetter) this.minecraft.getEntityRenderDispatcher()).locomotion$getFirstPersonPlayerRenderer()
                 .ifPresent(renderer -> renderer.extract(deltaTracker.getGameTimeDeltaPartialTick(true)));
+    }
+
+    @ModifyExpressionValue(
+            method = "renderItemInHand",
+            at = @At(value = "FIELD", target = "Lnet/minecraft/client/renderer/state/gui/GuiRenderState;isHudHidden:Z")
+    )
+    private boolean locomotion$keepHandVisibleInPreview(boolean isHudHidden) {
+        return isHudHidden && !LocomotionMain.CONFIG.isHeldItemPreviewActive();
     }
 
     @Inject(method = "bobHurt", at = @At("HEAD"))

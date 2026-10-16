@@ -30,3 +30,5 @@ replay_*.log
 /port-*.log
 scripts/Test-Compatibility.ps1
 /scripts
+*.md
+/docs

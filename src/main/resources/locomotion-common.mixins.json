@@ -24,6 +24,7 @@
     "render.MixinLivingEntityRenderer",
     "render.MixinModelFeatureRenderer",
     "render.MixinModelPart",
+    "render.MixinShaderManager",
     "render.block_entity.MixinBlockEntityRenderState",
     "render.block_entity.MixinChestRenderer",
     "render.block_entity.MixinShulkerBoxRenderer"

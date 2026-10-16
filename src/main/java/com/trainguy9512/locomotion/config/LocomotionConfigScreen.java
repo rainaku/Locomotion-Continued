@@ -12,13 +12,13 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 
 import java.text.DecimalFormat;
-import java.util.Objects;
 
 public class LocomotionConfigScreen {
     public static Screen createConfigScreen(Screen parentScreen) {
 
         LocomotionConfig config = LocomotionMain.CONFIG;
-        config.load();
+        // Already loaded during client initialization. Reloading here clears the
+        // animation containers while a pause menu cannot tick them back to life.
 
         return YetAnotherConfigLib.createBuilder()
                 .title(Component.translatable("locomotion.config.title"))
@@ -27,6 +27,7 @@ public class LocomotionConfigScreen {
 //                        .tooltip(Component.translatable("locomotion.config.category.general.tooltip"))
 //                        .build())
                 .category(firstPersonPlayerConfig(config))
+                .category(heldItemModelsConfig(config))
                 .category(blockEntitiesConfig(config))
                 .save(config::save)
                 .build()
@@ -199,6 +200,20 @@ public class LocomotionConfigScreen {
                                         .range(-16.00f, 16.00f)
                                         .step(0.1f))
                                 .build())
+                        .build())
+                .build();
+    }
+
+    private static ConfigCategory heldItemModelsConfig(LocomotionConfig config) {
+        return ConfigCategory.createBuilder()
+                .name(Component.translatable("locomotion.config.held_models.title"))
+                .tooltip(Component.translatable("locomotion.config.held_models.description"))
+                .option(LabelOption.create(Component.translatable("locomotion.config.held_models.editor.entry_help")))
+                .option(ButtonOption.createBuilder()
+                        .name(Component.translatable("locomotion.config.held_models.editor.open"))
+                        .text(Component.translatable("locomotion.config.held_models.editor.open"))
+                        .action((screen, option) -> net.minecraft.client.Minecraft.getInstance().gui.setScreen(new HeldItemModelScreen(screen, config)))
+                        .description(OptionDescription.of(Component.translatable("locomotion.config.held_models.editor.help")))
                         .build())
                 .build();
     }

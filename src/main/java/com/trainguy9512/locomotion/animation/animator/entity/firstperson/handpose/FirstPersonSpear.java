@@ -194,6 +194,9 @@ public class FirstPersonSpear {
 
     public static void extractSpearData(LocalPlayer player, DriverGetter driverContainer, MontageManager montageManager) {
         for (InteractionHand hand : InteractionHand.values()) {
+            if (player.isUsingItem() && player.getUsedItemHand() != hand) {
+                continue;
+            }
             ItemStack itemStack = player.getItemInHand(hand);
             KineticWeapon kineticWeapon = itemStack.get(DataComponents.KINETIC_WEAPON);
             if (kineticWeapon == null) {

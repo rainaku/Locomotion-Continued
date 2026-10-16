@@ -40,6 +40,7 @@ public class LocomotionConfig {
             .create();
 
     private Data configData;
+    private HeldItemModelSettings heldItemPreview;
 
     public LocomotionConfig() {
         this.configData = new Data();
@@ -49,6 +50,22 @@ public class LocomotionConfig {
         return configData;
     }
 
+    public HeldItemModelSettings heldItemModelsForRendering() {
+        return heldItemPreview != null ? heldItemPreview : configData.firstPersonPlayer.heldItemModels;
+    }
+
+    public boolean isHeldItemPreviewActive() {
+        return heldItemPreview != null;
+    }
+
+    public void beginHeldItemPreview(HeldItemModelSettings draft) {
+        heldItemPreview = draft;
+    }
+
+    public void endHeldItemPreview(HeldItemModelSettings draft) {
+        if (heldItemPreview == draft) heldItemPreview = null;
+    }
+
     public void load() {
         this.configData = new Data();
         if (Files.exists(CONFIG_FILE_PATH)) {
@@ -56,6 +73,8 @@ public class LocomotionConfig {
                 Data loaded = GSON.fromJson(reader, LocomotionConfig.Data.class);
                 if (loaded != null) {
                     if (loaded.firstPersonPlayer == null) loaded.firstPersonPlayer = new Data.FirstPersonPlayer();
+                    if (loaded.firstPersonPlayer.heldItemModels == null) loaded.firstPersonPlayer.heldItemModels = new HeldItemModelSettings();
+                    loaded.firstPersonPlayer.heldItemModels.sanitize();
                     if (loaded.blockEntities == null) loaded.blockEntities = new Data.BlockEntities();
                     if (loaded.blockEntities.enabledBlockEntities == null) loaded.blockEntities.enabledBlockEntities = Maps.newHashMap();
                     if (loaded.blockEntities.poseCalculationFrequency == null) loaded.blockEntities.poseCalculationFrequency = JointAnimator.PoseCalculationFrequency.CALCULATE_EVERY_FRAME;
@@ -72,6 +91,7 @@ public class LocomotionConfig {
     }
 
     public void save() {
+        this.configData.firstPersonPlayer.heldItemModels.sanitize();
         try {
             Files.createDirectories(CONFIG_FILE_PATH.toAbsolutePath().getParent());
             try (BufferedWriter writer = Files.newBufferedWriter(CONFIG_FILE_PATH)) {
@@ -90,6 +110,8 @@ public class LocomotionConfig {
         public BlockEntities blockEntities = new BlockEntities();
 
         public static class FirstPersonPlayer {
+
+            public HeldItemModelSettings heldItemModels = new HeldItemModelSettings();
 
             public boolean enableRenderer = true;
 

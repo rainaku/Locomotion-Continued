@@ -19,6 +19,8 @@ dependencies {
     implementation("net.fabricmc.fabric-api:fabric-api:${property("fabric_api_version")}")
     compileOnly("dev.isxander:yet-another-config-lib:${property("yacl_version")}")
     compileOnly("com.terraformersmc:modmenu:${property("modmenu_version")}")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.14.0")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.14.0")
     if (providers.gradleProperty("configUi").orNull == "true") {
         runtimeOnly("dev.isxander:yet-another-config-lib:${property("yacl_version")}")
         runtimeOnly("com.terraformersmc:modmenu:${property("modmenu_version")}")
@@ -82,6 +84,8 @@ tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
     options.release.set(25)
 }
+
+tasks.test { useJUnitPlatform() }
 
 tasks.jar {
     from("LICENSE") { rename { "${it}_locomotion" } }

@@ -30,6 +30,7 @@ import net.minecraft.client.renderer.state.level.PlayerRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.component.TypedDataComponent;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.HumanoidArm;
@@ -128,8 +129,16 @@ public class FirstPersonPlayerRenderer {
         }
         PoseStack itemStack = new PoseStack();
         pose.getJointChannel(FirstPersonJointAnimator.getItemJoint(side)).transformPoseStack(itemStack, 16f);
+        Matrix4f itemTransform = new Matrix4f(itemStack.last().pose());
+        if (!stack.isEmpty()) {
+            // Resolve the stack actually being animated, including swap transitions.
+            // Capture the result before deferred submission; arm transforms are separate.
+            String itemId = BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
+            LocomotionMain.CONFIG.heldItemModelsForRendering().resolve(itemId)
+                    .applyTo(itemTransform, side == HumanoidArm.LEFT);
+        }
         return new HandFrame(hand, side, new Matrix4f(pose.getJointChannel(FirstPersonJointAnimator.getArmJoint(side)).getTransform()),
-                new Matrix4f(itemStack.last().pose()), itemState, mapState, hasMapData, renderType);
+                itemTransform, itemState, mapState, hasMapData, renderType);
     }
 
     /** Returns false while assets/poses are unavailable so vanilla can render the hands. */
@@ -214,8 +223,11 @@ public class FirstPersonPlayerRenderer {
     }
 
     private static ItemStack getItemStackInHandToRender(AnimationDataContainer data, LocalPlayer player, InteractionHand hand) {
-        ItemStack rendered = data.getDriverValue(FirstPersonDrivers.getRenderedItemDriver(hand));
         ItemStack actual = player.getItemInHand(hand);
+        if (LocomotionMain.CONFIG.isHeldItemPreviewActive()) {
+            return actual;
+        }
+        ItemStack rendered = data.getDriverValue(FirstPersonDrivers.getRenderedItemDriver(hand));
         if (!ItemStack.isSameItem(actual, rendered)) {
             return rendered;
         }
