@@ -180,7 +180,7 @@ public final class JointChannel {
         Vector3f otherScale = other.transform.getScale(new Vector3f());
 
         translation.lerp(otherTranslation, weight);
-        rotation.slerp(otherRotation, weight);
+        rotation.slerp(otherRotation, weight).normalize();
         scale.lerp(otherScale, weight);
         boolean visibility = Interpolator.BOOLEAN_BLEND.interpolate(this.visibility, other.visibility, weight);
 

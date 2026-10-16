@@ -208,21 +208,21 @@ public class LocomotionConfigScreen extends Screen {
         addFloatRow(
                 "locomotion.config.option.first_person_camera_shake_intensity_master.name",
                 "locomotion.config.option.first_person_camera_shake_intensity_master.description",
-                1.0f, 0.00f, 1.00f, 0.01f, "%.2f",
+                1.0f, 0.00f, 5.00f, 0.01f, "%.2f",
                 () -> fp.cameraShakeMasterIntensity,
                 v -> fp.cameraShakeMasterIntensity = v
         );
         addFloatRow(
                 "locomotion.config.option.first_person_camera_shake_intensity_movement.name",
                 "locomotion.config.option.first_person_camera_shake_intensity_movement.description",
-                1.0f, 0.00f, 1.00f, 0.01f, "%.2f",
+                1.0f, 0.00f, 5.00f, 0.01f, "%.2f",
                 () -> fp.cameraShakeMovementIntensity,
                 v -> fp.cameraShakeMovementIntensity = v
         );
         addFloatRow(
                 "locomotion.config.option.first_person_camera_shake_intensity_item_interactions.name",
                 "locomotion.config.option.first_person_camera_shake_intensity_item_interactions.description",
-                0.5f, 0.00f, 1.00f, 0.01f, "%.2f",
+                0.5f, 0.00f, 5.00f, 0.01f, "%.2f",
                 () -> fp.cameraShakeItemInteractionIntensity,
                 v -> fp.cameraShakeItemInteractionIntensity = v
         );
