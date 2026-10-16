@@ -143,17 +143,6 @@ public class LocomotionConfig {
     }
 
     public Function<Screen, Screen> getConfigScreen(Predicate<String> ifModLoaded) {
-
-        if (ifModLoaded.test("yet_another_config_lib_v3")) {
-            return LocomotionConfigScreen::createConfigScreen;
-        } else {
-            return parent -> new AlertScreen(
-                    () -> Minecraft.getInstance().gui.setScreen(parent),
-                    Component.translatable("locomotion.config.yacl_not_found.header"),
-                    Component.translatable("locomotion.config.yacl_not_found.description"),
-                    Component.translatable("locomotion.config.yacl_not_found.close"),
-                    true
-            );
-        }
+        return LocomotionConfigScreen::createConfigScreen;
     }
 }

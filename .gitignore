@@ -32,3 +32,4 @@ scripts/Test-Compatibility.ps1
 /scripts
 *.md
 /docs
+*.log

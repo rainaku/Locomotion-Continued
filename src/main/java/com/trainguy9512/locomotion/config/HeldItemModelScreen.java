@@ -13,6 +13,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.HumanoidArm;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,9 +22,10 @@ import java.util.Objects;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 
-/** Uses the real in-world hand renderer as its preview, with no custom GPU pipeline. */
+/** Live 3D held-item model editor using the in-world first-person renderer. */
 public final class HeldItemModelScreen extends Screen {
     private enum Tab { POSITION, ROTATION, PIVOT }
+
     private enum SliderKind {
         PIXEL(-64f, 128f, 0.1f, 10f, " px", "position.description"),
         ANGLE(-180f, 360f, 0.5f, 2f, " deg", "rotation.description"),
@@ -50,16 +52,48 @@ public final class HeldItemModelScreen extends Screen {
         }
     }
 
+    private record AxisRow(
+            String key,
+            SliderKind kind,
+            String tooltipKey,
+            float defaultValue,
+            Function<ItemModelTransform, Float> getter,
+            BiConsumer<ItemModelTransform, Float> setter,
+            ModelSlider slider,
+            Button resetButton
+    ) {
+        void sync(HeldItemModelEditor editor) {
+            slider.syncFromModel();
+            float current = getter.apply(editor.current());
+            resetButton.active = editor.canEdit() && Math.abs(current - defaultValue) > 1e-4f;
+        }
+    }
+
+    private static final int SURFACE_BG = 0xEC10151E;
+    private static final int HEADER_BG = 0xFF171F2C;
+    private static final int BORDER_COLOR = 0xFF283548;
+    private static final int SLOT_BG = 0xFF161E2B;
+    private static final int SLOT_HOVER_BG = 0xFF212D40;
+    private static final int SLOT_ACTIVE_BG = 0xFF1E324C;
+    private static final int ACCENT_COLOR = 0xFF4CA6FF;
+    private static final int TEXT_PRIMARY = 0xFFF1F5F9;
+    private static final int TEXT_MUTED = 0xFF94A3B8;
+
     private final Screen parent;
     private final LocomotionConfig config;
     private final HeldItemModelEditor editor;
-    private final List<ModelSlider> sliders = new ArrayList<>();
+    private final List<AxisRow> axisRows = new ArrayList<>();
     private InteractionHand hand = InteractionHand.MAIN_HAND;
     private String selectedItem;
     private Tab tab = Tab.POSITION;
+    private Boolean manualPanelOnRight = null;
     private boolean panelOnRight;
     private int panelX;
+    private int panelY;
     private int panelWidth;
+    private int panelHeight;
+    private int hotbarStripX;
+    private int hotbarStripY;
     private CameraType previousCamera;
     private boolean hudWasHidden;
     private boolean previewStarted;
@@ -72,7 +106,9 @@ public final class HeldItemModelScreen extends Screen {
         this.config = config;
         this.editor = new HeldItemModelEditor(config.data().firstPersonPlayer.heldItemModels);
         if (minecraft.player != null && minecraft.player.getItemInHand(InteractionHand.MAIN_HAND).isEmpty()
-                && !minecraft.player.getItemInHand(InteractionHand.OFF_HAND).isEmpty()) hand = InteractionHand.OFF_HAND;
+                && !minecraft.player.getItemInHand(InteractionHand.OFF_HAND).isEmpty()) {
+            hand = InteractionHand.OFF_HAND;
+        }
     }
 
     @Override
@@ -82,7 +118,9 @@ public final class HeldItemModelScreen extends Screen {
             previousCamera = minecraft.options.getCameraType();
             minecraft.options.setCameraType(CameraType.FIRST_PERSON);
             hudWasHidden = minecraft.gui.hud.isHidden();
-            if (!hudWasHidden) minecraft.gui.hud.toggle();
+            if (!hudWasHidden) {
+                minecraft.gui.hud.toggle();
+            }
             previewStarted = true;
         }
     }
@@ -92,64 +130,109 @@ public final class HeldItemModelScreen extends Screen {
         config.endHeldItemPreview(editor.preview());
         if (previewStarted) {
             minecraft.options.setCameraType(previousCamera);
-            if (minecraft.gui.hud.isHidden() != hudWasHidden) minecraft.gui.hud.toggle();
+            if (minecraft.gui.hud.isHidden() != hudWasHidden) {
+                minecraft.gui.hud.toggle();
+            }
             previewStarted = false;
         }
     }
 
     @Override
     protected void init() {
-        sliders.clear();
+        axisRows.clear();
         updateTarget();
-        panelWidth = Math.min(250, Math.max(140, width / 2 - 12));
-        panelX = panelOnRight ? width - panelWidth - 6 : 6;
-        int x = panelX + 6;
-        int w = panelWidth - 12;
+        panelWidth = Math.min(236, Math.max(196, width / 2 - 12));
+        panelHeight = Math.min(242, height - 12);
+        panelY = Math.max(6, (height - panelHeight) / 2);
+        panelX = panelOnRight ? width - panelWidth - 8 : 8;
+
+        int x = panelX + 8;
+        int w = panelWidth - 16;
         int half = (w - 4) / 2;
         int third = (w - 8) / 3;
-        var global = button("mode.global", x, 24, half, () -> setMode(HeldItemModelSettings.Mode.GLOBAL));
-        global.active = editor.preview().mode != HeldItemModelSettings.Mode.GLOBAL;
-        var specific = button("mode.specific", x + half + 4, 24, w - half - 4, () -> setMode(HeldItemModelSettings.Mode.SPECIFIC));
-        specific.active = selectedItem != null && editor.preview().mode != HeldItemModelSettings.Mode.SPECIFIC;
-        boolean canCycleSlot = minecraft.player != null && hand == InteractionHand.MAIN_HAND;
-        int handWidth = canCycleSlot ? w - 40 : w;
-        addRenderableWidget(Button.builder(handName(), ignored -> {
-            hand = hand == InteractionHand.MAIN_HAND ? InteractionHand.OFF_HAND : InteractionHand.MAIN_HAND;
+
+        // Header controls: Help [?] and Dock Side Flip [⇄]
+        Button helpBtn = addRenderableWidget(Button.builder(Component.literal("?"), ignored -> {})
+                .bounds(panelX + panelWidth - 42, panelY + 4, 16, 16)
+                .tooltip(Tooltip.create(Component.translatable("locomotion.config.held_models.editor.help")))
+                .build());
+        helpBtn.active = false;
+
+        addRenderableWidget(Button.builder(Component.literal(panelOnRight ? "<" : ">"), ignored -> {
+            manualPanelOnRight = !panelOnRight;
             rebuildWidgets();
-        }).bounds(x, 46, handWidth, 18).build());
-        if (canCycleSlot) {
-            addRenderableWidget(Button.builder(Component.literal("<"), ignored -> cycleHotbarSlot(-1))
-                    .bounds(x + handWidth + 2, 46, 18, 18).build());
-            addRenderableWidget(Button.builder(Component.literal(">"), ignored -> cycleHotbarSlot(1))
-                    .bounds(x + handWidth + 22, 46, 18, 18).build());
+        }).bounds(panelX + panelWidth - 22, panelY + 4, 16, 16).build());
+
+        // Row 1: Scope Mode (All Items vs This Item) at panelY + 48
+        int scopeY = panelY + 48;
+        var globalBtn = button("mode.global", x, scopeY, half, () -> setMode(HeldItemModelSettings.Mode.GLOBAL));
+        globalBtn.active = editor.preview().mode != HeldItemModelSettings.Mode.GLOBAL;
+        var specificBtn = button("mode.specific", x + half + 4, scopeY, w - half - 4, () -> setMode(HeldItemModelSettings.Mode.SPECIFIC));
+        specificBtn.active = selectedItem != null && editor.preview().mode != HeldItemModelSettings.Mode.SPECIFIC;
+
+        // Row 2: Hotbar & Hand selector at panelY + 70
+        hotbarStripX = x;
+        hotbarStripY = panelY + 70;
+        if (minecraft.player == null) {
+            var mainBtn = addRenderableWidget(Button.builder(
+                    Component.translatable("locomotion.config.held_models.editor.main_hand"),
+                    ignored -> { hand = InteractionHand.MAIN_HAND; rebuildWidgets(); }
+            ).bounds(x, hotbarStripY, half, 18).build());
+            mainBtn.active = hand != InteractionHand.MAIN_HAND;
+
+            var offBtn = addRenderableWidget(Button.builder(
+                    Component.translatable("locomotion.config.held_models.editor.off_hand"),
+                    ignored -> { hand = InteractionHand.OFF_HAND; rebuildWidgets(); }
+            ).bounds(x + half + 4, hotbarStripY, w - half - 4, 18).build());
+            offBtn.active = hand != InteractionHand.OFF_HAND;
         }
-        var position = button("editor.position", x, 82, third, () -> { tab = Tab.POSITION; rebuildWidgets(); });
-        position.active = tab != Tab.POSITION;
-        var rotation = button("editor.rotation", x + third + 4, 82, third, () -> { tab = Tab.ROTATION; rebuildWidgets(); });
-        rotation.active = tab != Tab.ROTATION;
-        var pivot = button("editor.pivot", x + (third + 4) * 2, 82, w - (third + 4) * 2, () -> { tab = Tab.PIVOT; rebuildWidgets(); });
-        pivot.active = tab != Tab.PIVOT;
+
+        // Row 3: Transform Tab (Position | Rotation | Pivot) at panelY + 94
+        int tabY = panelY + 94;
+        var posBtn = button("editor.position", x, tabY, third, () -> { tab = Tab.POSITION; rebuildWidgets(); });
+        posBtn.active = tab != Tab.POSITION;
+        var rotBtn = button("editor.rotation", x + third + 4, tabY, third, () -> { tab = Tab.ROTATION; rebuildWidgets(); });
+        rotBtn.active = tab != Tab.ROTATION;
+        var pivBtn = button("editor.pivot", x + (third + 4) * 2, tabY, w - (third + 4) * 2, () -> { tab = Tab.PIVOT; rebuildWidgets(); });
+        pivBtn.active = tab != Tab.PIVOT;
+
+        // Row 4: Axis Sliders with [-], [+], and per-axis [↺] reset
         SliderKind axisKind = tab == Tab.ROTATION ? SliderKind.ANGLE : SliderKind.PIXEL;
         String tooltipKey = tab == Tab.PIVOT ? "pivot.description" : axisKind.descriptionKey;
-        addSlider(x, 104, w, axisKey("x"), axisKind, tooltipKey,
+        int sliderStart = panelY + 116;
+
+        addAxisControl(x, sliderStart, w, axisKey("x"), axisKind, tooltipKey, 0f,
                 t -> switch (tab) { case POSITION -> t.positionX; case ROTATION -> t.rotationX; case PIVOT -> t.pivotX; },
                 (t, value) -> { switch (tab) { case POSITION -> t.positionX = value; case ROTATION -> t.rotationX = value; case PIVOT -> t.pivotX = value; } });
-        addSlider(x, 126, w, axisKey("y"), axisKind, tooltipKey,
+
+        addAxisControl(x, sliderStart + 21, w, axisKey("y"), axisKind, tooltipKey, 0f,
                 t -> switch (tab) { case POSITION -> t.positionY; case ROTATION -> t.rotationY; case PIVOT -> t.pivotY; },
                 (t, value) -> { switch (tab) { case POSITION -> t.positionY = value; case ROTATION -> t.rotationY = value; case PIVOT -> t.pivotY = value; } });
-        addSlider(x, 148, w, axisKey("z"), axisKind, tooltipKey,
+
+        addAxisControl(x, sliderStart + 42, w, axisKey("z"), axisKind, tooltipKey, 0f,
                 t -> switch (tab) { case POSITION -> t.positionZ; case ROTATION -> t.rotationZ; case PIVOT -> t.pivotZ; },
                 (t, value) -> { switch (tab) { case POSITION -> t.positionZ = value; case ROTATION -> t.rotationZ = value; case PIVOT -> t.pivotZ = value; } });
-        addSlider(x, 174, w, "scale", SliderKind.SCALE, SliderKind.SCALE.descriptionKey, t -> t.scale, (t, value) -> t.scale = value);
-        var reset = button(editor.preview().mode == HeldItemModelSettings.Mode.GLOBAL ? "editor.reset" : "editor.inherit",
-                x, 196, w, () -> { editor.reset(); rebuildWidgets(); });
-        reset.active = editor.canEdit();
+
+        addAxisControl(x, sliderStart + 65, w, "scale", SliderKind.SCALE, SliderKind.SCALE.descriptionKey, 1f,
+                t -> t.scale, (t, value) -> t.scale = value);
+
+        // Footer Row: Reset All / Inherit | Save | Cancel
+        int footerY = panelY + panelHeight - 24;
+        int resetW = Math.max(54, w / 3 - 2);
+        int actionW = (w - resetW - 8) / 2;
+
+        var resetAll = button(editor.preview().mode == HeldItemModelSettings.Mode.GLOBAL ? "editor.reset" : "editor.inherit",
+                x, footerY, resetW, () -> { editor.reset(); syncControls(); });
+        resetAll.active = editor.canEdit();
+
         addRenderableWidget(Button.builder(Component.translatable("locomotion.config.held_models.editor.save"), ignored -> {
             config.data().firstPersonPlayer.heldItemModels = editor.snapshot();
             config.save();
             onClose();
-        }).bounds(x, height - 22, half, 18).build());
-        button("editor.cancel", x + half + 4, height - 22, w - half - 4, this::onClose);
+        }).bounds(x + resetW + 4, footerY, actionW, 18).build());
+
+        button("editor.cancel", x + resetW + actionW + 8, footerY, w - resetW - actionW - 8, this::onClose);
+        syncControls();
     }
 
     private String axisKey(String axis) {
@@ -160,30 +243,50 @@ public final class HeldItemModelScreen extends Screen {
         };
     }
 
-    private void cycleHotbarSlot(int delta) {
-        if (minecraft.player == null) return;
-        Inventory inventory = minecraft.player.getInventory();
-        inventory.setSelectedSlot(Math.floorMod(inventory.getSelectedSlot() + delta, 9));
-        rebuildWidgets();
-    }
-
     private Button button(String key, int x, int y, int width, Runnable action) {
         return addRenderableWidget(Button.builder(Component.translatable("locomotion.config.held_models." + key), ignored -> action.run())
                 .bounds(x, y, width, 18).build());
     }
 
-    private void addSlider(int x, int y, int width, String key, SliderKind kind, String tooltipKey,
-                           Function<ItemModelTransform, Float> getter, BiConsumer<ItemModelTransform, Float> setter) {
-        var slider = new ModelSlider(x, y, width, key, kind, getter, value -> editor.edit(transform -> setter.accept(transform, value)));
+    private void addAxisControl(int x, int y, int width, String key, SliderKind kind, String tooltipKey, float defaultVal,
+                                Function<ItemModelTransform, Float> getter, BiConsumer<ItemModelTransform, Float> setter) {
+        int btnW = 14;
+        int resetW = 16;
+        int sliderW = width - (btnW * 2) - resetW - 6;
+
+        Button minusBtn = addRenderableWidget(Button.builder(Component.literal("-"), ignored -> {
+            editor.edit(t -> setter.accept(t, kind.round(getter.apply(t) - kind.step)));
+            syncControls();
+        }).bounds(x, y, btnW, 18).build());
+        minusBtn.active = editor.canEdit();
+
+        var slider = new ModelSlider(x + btnW + 2, y, sliderW, key, kind, getter, value -> {
+            editor.edit(transform -> setter.accept(transform, value));
+            syncControls();
+        });
         slider.active = editor.canEdit();
         slider.setTooltip(Tooltip.create(Component.translatable("locomotion.config.held_models." + tooltipKey)));
-        sliders.add(slider);
         addRenderableWidget(slider);
+
+        Button plusBtn = addRenderableWidget(Button.builder(Component.literal("+"), ignored -> {
+            editor.edit(t -> setter.accept(t, kind.round(getter.apply(t) + kind.step)));
+            syncControls();
+        }).bounds(x + btnW + sliderW + 4, y, btnW, 18).build());
+        plusBtn.active = editor.canEdit();
+
+        Button resetBtn = addRenderableWidget(Button.builder(Component.literal("R"), ignored -> {
+            editor.edit(t -> setter.accept(t, defaultVal));
+            syncControls();
+        }).bounds(x + width - resetW, y, resetW, 18)
+                .tooltip(Tooltip.create(Component.translatable("locomotion.config.held_models.editor.reset")))
+                .build());
+
+        axisRows.add(new AxisRow(key, kind, tooltipKey, defaultVal, getter, setter, slider, resetBtn));
     }
 
-    private void syncSliders() {
-        for (ModelSlider slider : sliders) {
-            slider.syncFromModel();
+    private void syncControls() {
+        for (AxisRow row : axisRows) {
+            row.sync(editor);
         }
     }
 
@@ -192,9 +295,15 @@ public final class HeldItemModelScreen extends Screen {
         rebuildWidgets();
     }
 
+    private ItemStack activeItemStack() {
+        if (minecraft.player == null) return ItemStack.EMPTY;
+        return minecraft.player.getItemInHand(hand);
+    }
+
     private String itemInHand() {
-        if (minecraft.player == null || minecraft.player.getItemInHand(hand).isEmpty()) return null;
-        return BuiltInRegistries.ITEM.getKey(minecraft.player.getItemInHand(hand).getItem()).toString();
+        ItemStack stack = activeItemStack();
+        if (stack.isEmpty()) return null;
+        return BuiltInRegistries.ITEM.getKey(stack.getItem()).toString();
     }
 
     private boolean isLeftArm() {
@@ -206,30 +315,58 @@ public final class HeldItemModelScreen extends Screen {
     private void updateTarget() {
         selectedItem = itemInHand();
         editor.selectItem(selectedItem);
-        if (minecraft.player != null) {
+        if (manualPanelOnRight != null) {
+            panelOnRight = manualPanelOnRight;
+        } else if (minecraft.player != null) {
             panelOnRight = isLeftArm();
         }
     }
 
-    private boolean isInPanel(double mouseX) {
-        return mouseX >= panelX && mouseX < panelX + panelWidth;
-    }
-
-    private Component handName() {
-        return Component.translatable("locomotion.config.held_models.editor." + (hand == InteractionHand.MAIN_HAND ? "main_hand" : "off_hand"));
+    private boolean isInPanel(double mouseX, double mouseY) {
+        return mouseX >= panelX && mouseX < panelX + panelWidth && mouseY >= panelY && mouseY < panelY + panelHeight;
     }
 
     @Override
     public void tick() {
-        if (!Objects.equals(selectedItem, itemInHand())) rebuildWidgets();
+        if (!Objects.equals(selectedItem, itemInHand())) {
+            rebuildWidgets();
+        }
     }
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        if (super.mouseClicked(event, doubleClick)) return true;
-        if (!isInPanel(event.x()) && editor.canEdit() && (event.button() == 0 || event.button() == 1)) {
+        if (minecraft.player != null && event.button() == 0 && handleHotbarStripClick(event.x(), event.y())) {
+            return true;
+        }
+        if (super.mouseClicked(event, doubleClick)) {
+            return true;
+        }
+        if (!isInPanel(event.x(), event.y()) && editor.canEdit() && (event.button() == 0 || event.button() == 1)) {
             draggingPreview = true;
             dragButton = event.button();
+            return true;
+        }
+        return false;
+    }
+
+    private boolean handleHotbarStripClick(double mouseX, double mouseY) {
+        if (mouseY < hotbarStripY || mouseY >= hotbarStripY + 20) {
+            return false;
+        }
+        Inventory inv = minecraft.player.getInventory();
+        for (int i = 0; i < 9; i++) {
+            int sx = hotbarStripX + i * 21;
+            if (mouseX >= sx && mouseX < sx + 20) {
+                inv.setSelectedSlot(i);
+                hand = InteractionHand.MAIN_HAND;
+                rebuildWidgets();
+                return true;
+            }
+        }
+        int offX = hotbarStripX + 9 * 21 + 5;
+        if (mouseX >= offX && mouseX < offX + 20) {
+            hand = InteractionHand.OFF_HAND;
+            rebuildWidgets();
             return true;
         }
         return false;
@@ -277,7 +414,7 @@ public final class HeldItemModelScreen extends Screen {
                     }
                 }
             });
-            syncSliders();
+            syncControls();
             return true;
         }
         return super.mouseDragged(event, dragX, dragY);
@@ -285,9 +422,9 @@ public final class HeldItemModelScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
-        if (!isInPanel(mouseX) && editor.canEdit() && scrollY != 0) {
+        if (!isInPanel(mouseX, mouseY) && editor.canEdit() && scrollY != 0) {
             editor.edit(t -> t.scale = SliderKind.SCALE.round(t.scale + scrollY * 0.05));
-            syncSliders();
+            syncControls();
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
@@ -295,8 +432,9 @@ public final class HeldItemModelScreen extends Screen {
 
     @Override
     public boolean keyPressed(KeyEvent event) {
-        if (minecraft.player != null && hand == InteractionHand.MAIN_HAND && event.key() >= 49 && event.key() <= 57) {
+        if (minecraft.player != null && event.key() >= 49 && event.key() <= 57) {
             minecraft.player.getInventory().setSelectedSlot(event.key() - 49);
+            hand = InteractionHand.MAIN_HAND;
             rebuildWidgets();
             return true;
         }
@@ -305,35 +443,104 @@ public final class HeldItemModelScreen extends Screen {
 
     @Override
     public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
-        if (minecraft.level == null) super.extractBackground(graphics, mouseX, mouseY, partialTick);
-        // Leave the actual world and held model clear; no full-screen tint or blur.
-        graphics.fill(panelX, 0, panelX + panelWidth, height, 0xDB10151F);
+        if (minecraft.level == null) {
+            super.extractBackground(graphics, mouseX, mouseY, partialTick);
+        }
+        // Main dock surface
+        graphics.fill(panelX, panelY, panelX + panelWidth, panelY + panelHeight, SURFACE_BG);
+        // Header bar
+        graphics.fill(panelX, panelY, panelX + panelWidth, panelY + 24, HEADER_BG);
+        graphics.fill(panelX, panelY + 24, panelX + panelWidth, panelY + 25, BORDER_COLOR);
+        // Crisp 1px outer border
+        drawOutline(graphics, panelX, panelY, panelWidth, panelHeight, BORDER_COLOR);
     }
 
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
-        graphics.centeredText(font, title, panelX + panelWidth / 2, 8, 0xFFFFFFFF);
-        graphics.enableScissor(panelX + 6, 66, panelX + panelWidth - 6, 80);
-        graphics.text(font, selectedItem == null ? Component.translatable("locomotion.config.held_models.editor.empty_hand") : Component.literal(selectedItem),
-                panelX + 6, 68, 0xFFB8C7D9);
-        graphics.disableScissor();
-        int textX = panelOnRight ? 8 : panelX + panelWidth + 8;
-        int textWidth = Math.max(40, width - panelWidth - 24);
-        int helpY = graphics.textWithWordWrap(font, Component.translatable("locomotion.config.held_models.editor.live",
-                Component.translatable("locomotion.config.held_models.mode." + editor.preview().mode.name().toLowerCase(Locale.ROOT))),
-                textX, 12, textWidth, 0xFF8AFFAA) + 8;
-        int hintY = graphics.textWithWordWrap(font, Component.translatable("locomotion.config.held_models.editor.help"),
-                textX, helpY, textWidth, 0xFFFFFFFF) + 8;
-        if (minecraft.level == null || minecraft.player == null) {
-            graphics.textWithWordWrap(font, Component.translatable("locomotion.config.held_models.editor.join_world"), textX, hintY, textWidth, 0xFFFFD080);
-        } else if (tab == Tab.PIVOT && isIdentityScaleAndRotation(editor.current())) {
-            graphics.textWithWordWrap(font, Component.translatable("locomotion.config.held_models.editor.pivot_hint"), textX, hintY, textWidth, 0xFFFFD080);
+        // Title in header
+        graphics.text(font, title, panelX + 8, panelY + 8, TEXT_PRIMARY);
+
+        // Active item row (Icon + Display Name)
+        ItemStack currentStack = activeItemStack();
+        int itemRowY = panelY + 28;
+        if (!currentStack.isEmpty()) {
+            graphics.fakeItem(currentStack, panelX + 8, itemRowY);
+            graphics.enableScissor(panelX + 28, itemRowY, panelX + panelWidth - 8, itemRowY + 18);
+            graphics.text(font, currentStack.getHoverName(), panelX + 28, itemRowY + 4, TEXT_PRIMARY);
+            graphics.disableScissor();
+        } else {
+            graphics.text(font, Component.translatable("locomotion.config.held_models.editor.empty_hand"),
+                    panelX + 8, itemRowY + 4, TEXT_MUTED);
         }
+
+        // Visual 9-slot Hotbar + Offhand strip when in-game
+        if (minecraft.player != null) {
+            renderHotbarStrip(graphics, mouseX, mouseY);
+        }
+
+        // Only show a notice in the viewport if no world is loaded
+        if (minecraft.level == null || minecraft.player == null) {
+            int viewX = panelOnRight ? 16 : panelX + panelWidth + 16;
+            int viewW = Math.max(80, width - panelWidth - 36);
+            graphics.textWithWordWrap(font, Component.translatable("locomotion.config.held_models.editor.join_world"),
+                    viewX, height / 2 - 12, viewW, 0xFFFFD080);
+        }
+
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
     }
 
-    private static boolean isIdentityScaleAndRotation(ItemModelTransform t) {
-        return t.scale == 1f && t.rotationX == 0f && t.rotationY == 0f && t.rotationZ == 0f;
+    private void renderHotbarStrip(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
+        Inventory inv = minecraft.player.getInventory();
+        int selectedSlot = inv.getSelectedSlot();
+        Component hoveredTooltip = null;
+
+        for (int i = 0; i < 9; i++) {
+            int sx = hotbarStripX + i * 21;
+            boolean active = hand == InteractionHand.MAIN_HAND && selectedSlot == i;
+            boolean hovered = mouseX >= sx && mouseX < sx + 20 && mouseY >= hotbarStripY && mouseY < hotbarStripY + 20;
+            ItemStack stack = inv.getItem(i);
+            drawSlotCell(graphics, sx, hotbarStripY, stack, active, hovered, String.valueOf(i + 1));
+            if (hovered) {
+                hoveredTooltip = stack.isEmpty()
+                        ? Component.translatable("locomotion.config.held_models.editor.main_hand").append(" (" + (i + 1) + ")")
+                        : stack.getHoverName();
+            }
+        }
+
+        int offX = hotbarStripX + 9 * 21 + 5;
+        boolean offActive = hand == InteractionHand.OFF_HAND;
+        boolean offHovered = mouseX >= offX && mouseX < offX + 20 && mouseY >= hotbarStripY && mouseY < hotbarStripY + 20;
+        ItemStack offStack = minecraft.player.getItemInHand(InteractionHand.OFF_HAND);
+        drawSlotCell(graphics, offX, hotbarStripY, offStack, offActive, offHovered, "F");
+        if (offHovered) {
+            hoveredTooltip = offStack.isEmpty()
+                    ? Component.translatable("locomotion.config.held_models.editor.off_hand")
+                    : offStack.getHoverName();
+        }
+
+        if (hoveredTooltip != null) {
+            graphics.setTooltipForNextFrame(font, hoveredTooltip, mouseX, mouseY);
+        }
+    }
+
+    private void drawSlotCell(GuiGraphicsExtractor graphics, int x, int y, ItemStack stack,
+                              boolean active, boolean hovered, String badgeText) {
+        int bg = active ? SLOT_ACTIVE_BG : (hovered ? SLOT_HOVER_BG : SLOT_BG);
+        int border = active ? ACCENT_COLOR : BORDER_COLOR;
+        graphics.fill(x, y, x + 20, y + 20, bg);
+        drawOutline(graphics, x, y, 20, 20, border);
+        if (!stack.isEmpty()) {
+            graphics.fakeItem(stack, x + 2, y + 2);
+        } else {
+            graphics.centeredText(font, Component.literal(badgeText), x + 10, y + 6, TEXT_MUTED);
+        }
+    }
+
+    static void drawOutline(GuiGraphicsExtractor graphics, int x, int y, int width, int height, int color) {
+        graphics.fill(x, y, x + width, y + 1, color);
+        graphics.fill(x, y + height - 1, x + width, y + height, color);
+        graphics.fill(x, y, x + 1, y + height, color);
+        graphics.fill(x + width - 1, y, x + width, y + height, color);
     }
 
     @Override public boolean isInGameUi() { return true; }
@@ -361,17 +568,20 @@ public final class HeldItemModelScreen extends Screen {
             updateMessage();
         }
 
-        @Override protected void updateMessage() {
+        @Override
+        protected void updateMessage() {
             setMessage(Component.translatable("locomotion.config.held_models." + key).append(": ")
                     .append(String.format(Locale.ROOT, "%.2f%s", getter.apply(editor.current()), kind.unit)));
         }
 
-        @Override protected void applyValue() {
+        @Override
+        protected void applyValue() {
             double actual = kind.min + value * kind.span;
             setter.accept(kind.round(actual));
         }
 
-        @Override public boolean keyPressed(KeyEvent event) {
+        @Override
+        public boolean keyPressed(KeyEvent event) {
             if (canChangeValue && (event.isLeft() || event.isRight())) {
                 setValue(value + (event.isLeft() ? -1 : 1) * (kind.step / kind.span));
                 return true;
